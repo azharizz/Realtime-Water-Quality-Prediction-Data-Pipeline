@@ -1,0 +1,305 @@
+Install docker 
+
+sudo apt update
+
+sudo apt install apt-transport-https ca-certificates curl gnupg2 software-properties-common
+
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update
+
+sudo apt install docker-ce docker-ce-cli containerd.io
+
+sudo systemctl start docker
+
+sudo usermod -aG docker your_username
+sudo usermod -aG docker azharizzannada
+
+sudo apt update
+
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+sudo chmod +x /usr/local/bin/docker-compose
+
+docker-compose --version
+
+
+
+
+https://www.mongodb.com/docs/kafka-connector/current/tutorials/tutorial-setup/#std-label-kafka-tutorials-docker-setup
+
+
+( GET MONGODB IP )
+EXTERNAL-IP:35001
+34.87.17.93:35001
+
+
+
+
+
+https://www.mongodb.com/docs/kafka-connector/current/tutorials/source-connector/
+
+
+db.water_quality_collection.insertOne({"Hardness": 10,"Solids": 20791.318980747026,"Chloramines": 7.300211873184757,"Sulfate": 368.51644134980336,"Conductivity": 564.3086541722439,"Organic_carbon": 10.3797830780847,"Trihalomethanes": 86.9909704615088,"Turbidity": 2.9631353806316407})
+
+--------------------------------------------------------------------------------------------------------------------------------------
+
+INSTALL PYSPARK
+
+sudo apt-get isntall wget
+
+
+wget https://archive.apache.org/dist/spark/spark-3.1.1/spark-3.1.1-bin-hadoop3.2.tgz
+
+sudo tar -xzf spark
+
+cd /opt
+
+mkdir spark
+
+cp -r /home/azharizzannada/spark_install/spark-3.1.1-bin-hadoop3.2/* /opt/spark
+
+export SPARK_HOME=/opt/spark
+export PATH=$SPARK_HOME/bin:$PATH
+
+echo 'export SPARK_HOME=/opt/spark' >> ~/.bashrc
+echo 'export PATH=$SPARK_HOME/bin:$PATH' >> ~/.bashrc
+
+source ~/.bashrc
+
+
+
+---------------------------------------------------------------------------------------------------------
+
+INSTALL JAVA
+
+
+sudo apt update
+
+sudo apt-get install openjdk-11-jdk
+
+
+
+
+--------------------------------------------------------------------------------------------------------------
+
+sudo docker inspect container broker
+
+"IPAddress": "172.18.0.3",
+
+
+mkdir app
+mkdir app/checkpointlocation
+
+requirements.txt
+
+pyspark==3.1.1
+google-cloud-bigquery==2.0.0
+
+
+dockerfile
+
+
+# Use an official Python runtime as the base image
+FROM python:3.8-slim
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the requirements.txt file into the container
+COPY requirements.txt .
+
+# Install OpenJDK
+RUN apt-get update && \
+    apt-get install -y openjdk-11-jdk && \
+    apt-get clean;
+
+# Set JAVA_HOME environment variable
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
+# Install the Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the PySpark application code into the container
+COPY spark_to_bigquery.py .
+
+# Set environment variables
+#ENV SPARK_HOME=/spark
+#ENV PYSPARK_PYTHON=/usr/local/bin/python
+#ENV PYSPARK_DRIVER_PYTHON=/usr/local/bin/python
+
+# Copy and extract Spark binaries
+# COPY spark-3.1.1-bin-hadoop3.2.tgz .
+# RUN tar -xzf spark-3.1.1-bin-hadoop3.2.tgz && rm spark-3.1.1-bin-hadoop3.2.tgz && mv spark-3.1.1-bin-hadoop3.2 spark
+
+# Set Spark configurations
+#ENV PATH=$PATH:$SPARK_HOME/bin
+#ENV PYSPARK_SUBMIT_ARGS="--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1,com.google.cloud:google-cloud-bigquery:2.0.0 pyspark-shell"
+
+# Set the environment variables
+ENV PYSPARK_PYTHON=python
+ENV PYSPARK_DRIVER_PYTHON=python
+
+# Run the PySpark application
+CMD ["spark-submit", "--master", "local[*]", "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1,com.google.cloud:google-cloud-bigquery:2.0.0,com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.23.0", "/app/spark_to_bigquery.py"]
+
+
+
+
+
+spark_to_bigquery.py
+
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import *
+
+spark = SparkSession.builder \
+    .appName("WaterPySparkApp") \
+    .getOrCreate()
+
+print("Trying to get read stream")
+print("==================================================================================================================================================")
+
+kafka_topic = "waterdb.water_quality_collection"
+
+df = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "172.18.0.3:9092") \
+    .option("subscribe", kafka_topic) \
+    .load()
+
+# Perform necessary transformations on the DataFrame
+
+print("Trying to write stream")
+print("================================================================================================")
+
+#df.show(1)
+
+# Write the transformed DataFrame to BigQuery
+df.writeStream \
+    .format("bigquery") \
+    .option("checkpointLocation", "/home/azharizzannada/app/checkpointlocation") \
+    .option("table", "project-azhar-385817.water_quality.post_testing") \
+    .start()
+#    .awaitTermination()
+
+spark.streams.awaitAnyTermination()
+
+
+
+
+
+
+
+----------------------------------------------------------------------------------------------------
+
+mongodb://34.142.208.24:35001/?directConnection=true
+
+
+sudo docker build -t spark_to_bigquery .
+
+
+
+sudo docker run --network mongo-kafka_localnet spark_to_bigquery
+
+
+/etc/kafka
+
+docker stop broker
+
+docker start broker
+
+
+sudo docker build -t spark_to_bigquery .
+
+sudo docker run --network mongo-kafka_localnet  spark_to_bigquery
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+docker run -it --name pyspark --network kafka-network -p 4040:4040 -p 8080:8080 -v <path_to_pyspark_app>:/app spark:3.1.1 bin/spark-submit --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1,/path/to/google-cloud-sdk/lib/google-cloud-bigquery-<version>.jar --py-files /app/your_pyspark_app.py
+
+
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import *
+
+spark = SparkSession.builder \
+    .appName("waterqualityapp") \
+    .getOrCreate()
+
+kafka_topic = "mongodb-topic"
+
+df = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka:9092") \
+    .option("subscribe", kafka_topic) \
+    .load()
+
+# Perform necessary transformations on the DataFrame
+#     .option("checkpointLocation", "/path/to/checkpoint") \
+#    .option("temporaryGcsBucket", "your-gcs-bucket") \
+#    .option("project", "your-gcp-project-id") \
+#    .option("parentProject", "your-parent-gcp-project-id") \
+#     .outputMode("append") \
+#  .mode("append") \
+
+# Write the transformed DataFrame to BigQuery
+df.writeStream \
+    .format("bigquery") \
+    .option("checkpointLocation", "/home/azharizzannada/app/checkpointlocation") \
+    .option("table", "project-azhar-385817.water_quality.post_testing") \
+    .start()
+
+spark.streams.awaitAnyTermination()
+
+waterdb.water-quality
+
+
+docker run -it --name pyspark --network kafka-network -p 4040:4040 -p 8080:8080 -v <path_to_pyspark_app>:/app spark:3.1.1 bin/spark-submit --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1,/path/to/google-cloud-sdk/lib/google-cloud-bigquery-<version>.jar --py-files /app/your_pyspark_app.py
+
+
+docker run -it --name pyspark -p 4040:4040 -p 8080:8080 -v /home/azharizzannada/app/spark_to_bigquery.py:/app spark:3.1.1 bin/spark-submit --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1,com.google.cloud:google-cloud-bigquery:2.0.0 --py-files /home/azharizzannada/app/spark_to_bigquery.py
+
+spark-submit --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1 --packages com.google.cloud:google-cloud-bigquery:2.0.0 /home/azharizzannada/app/spark_to_bigquery.py
+
+
+spark-submit --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1,com.google.cloud:google-cloud-bigquery:2.0.0 /home/azharizzannada/app/spark_to_bigquery.py
+
+
+spark-submit --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1 --jars /path/to/spark-bigquery-with-dependencies_2.12-{version}.jar /home/azharizzannada/app/spark_to_bigquery.py
+
+spark-submit --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1,com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.23.0 /home/azharizzannada/app/spark_to_bigquery.py
+
+
+i got this message after i run docker run for python app before:
+23/05/07 16:23:47 WARN ClientUtils: Couldn't resolve server broker:9092 from bootstrap.servers as DNS resolution failed for broker
+
+where is my kafka.bootstrap.servers
+
+and this is for docker ps output :
+CONTAINER ID   IMAGE                              COMMAND                  CREATED       STATUS                 PORTS                                                               NAMES
+18129f740d9d   mongodb-kafka-base-mongod:1.0      "docker-entrypoint.s…"   8 hours ago   Up 8 hours             0.0.0.0:35001->27017/tcp, :::35001->27017/tcp                       mongo1
+53cf012483cb   confluentinc/cp-kafka-rest:7.2.2   "/etc/confluent/dock…"   8 hours ago   Up 8 hours             8082/tcp                                                            rest-proxy
+9211861370fe   mongo-kafka-connect                "/etc/confluent/dock…"   8 hours ago   Up 8 hours (healthy)   8083/tcp, 9092/tcp, 0.0.0.0:35000->35000/tcp, :::35000->35000/tcp   connect
+5666af627d28   confluentinc/cp-kafka:7.2.2        "/etc/confluent/dock…"   8 hours ago   Up 8 hours             9092/tcp                                                            broker
+a6c3c0c5e2dd   confluentinc/cp-zookeeper:7.2.2    "/etc/confluent/dock…"   8 hours ago   Up 8 hours             2181/tcp, 2888/tcp, 3888/tcp                                        zookeeper
+
+
+docker run -it --name pyspark --network kafka-network -v /path/to/google-cloud-sdk:/path/to/google-cloud-sdk -e GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json your-pyspark-app-image bin/spark-submit --master local[*] --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1 --py-files /app/your_pyspark_app.py
+
+172.18.0.3
+
+

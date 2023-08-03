@@ -1,0 +1,58 @@
+
+# Use an official Python runtime as the base image
+FROM python:3.8-slim
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the requirements.txt file into the container
+COPY requirements.txt .
+
+# Install OpenJDK
+RUN apt-get update && \
+    apt-get install -y openjdk-11-jdk && \
+    apt-get clean;
+
+# Set JAVA_HOME environment variable
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+# Install the Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the PySpark application code into the container
+COPY spark_to_bigquery.py .
+
+#COPY project-azhar-385817-e6f6399ddb7c.json .
+COPY key_file.json .
+
+COPY kafka-clients-7.2.2-ccs.jar .
+
+COPY gcs-connector-hadoop3-latest.jar .
+
+COPY water_potability.csv .
+
+#COPY util-2.2.12-javadoc.jar .
+# Set environment variables
+#ENV SPARK_HOME=/spark
+#ENV PYSPARK_PYTHON=/usr/local/bin/python
+#ENV PYSPARK_DRIVER_PYTHON=/usr/local/bin/python
+
+# Copy and extract Spark binaries
+# COPY spark-3.1.1-bin-hadoop3.2.tgz .
+# RUN tar -xzf spark-3.1.1-bin-hadoop3.2.tgz && rm spark-3.1.1-bin-hadoop3.2.tgz && mv spark-3.1.1-bin-hadoop3.2 spark
+
+# Set Spark configurations
+#ENV PATH=$PATH:$SPARK_HOME/bin
+#ENV PYSPARK_SUBMIT_ARGS="--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1,com.google.cloud:google-cloud-bigquery:2.0.0 pyspark-shell"
+
+# Set the environment variables
+ENV PYSPARK_PYTHON=python
+ENV PYSPARK_DRIVER_PYTHON=python
+
+#ENV GOOGLE_APPLICATION_CREDENTIALS="/app/key_file.json"
+
+#/home/azharizzannada/app/gcs-connector-hadoop3-2.1.4.jar
+# /home/azharizzannada/app/kafka-clients-7.2.2-ccs.jar,/home/azharizzannada/app/gcs-connector-
+# Run the PySpark application
+CMD ["spark-submit", "--master", "local[*]" ,"--conf",  "spark.hadoop.google.cloud.auth.service.account.json.keyfile=/app/key_file.json", "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.1","--jars", "/app/water-quality-bucket/kafka-clients-7.2.2-ccs.jar,/app/gcs-connector-hadoop3-latest.jar", "/app/spark_to_bigquery.py"]
+
+
